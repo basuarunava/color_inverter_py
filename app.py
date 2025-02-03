@@ -35,38 +35,43 @@ def invert_pdf_pages(input_pdf, output_pdf, page_selection):
     doc.save(output_pdf)
     doc.close()
 
-def invert_pdf_document(input_file, page_selection):
-    # If input_file is a file-like object, write its content to a temp file.
-    # Otherwise, assume it's a file path.
+def invert_pdf_document(input_file, page_selection, output_name):
+    print(f"[LOG] Starting PDF inversion for {input_file} on pages: {page_selection}")
     if hasattr(input_file, "read"):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_in:
             tmp_in.write(input_file.read())
             tmp_in_path = tmp_in.name
         cleanup = True
+        print(f"[LOG] Created temporary input file: {tmp_in_path}")
     else:
         tmp_in_path = input_file
         cleanup = False
 
-    # Create a temporary file to save the inverted PDF.
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_out:
         tmp_out_path = tmp_out.name
+    print(f"[LOG] Created temporary output file: {tmp_out_path}")
 
     invert_pdf_pages(tmp_in_path, tmp_out_path, page_selection)
+    print(f"[LOG] Successfully inverted pages: {page_selection}")
 
-    # Clean up temporary input file if it was created.
     if cleanup:
         os.remove(tmp_in_path)
-    return tmp_out_path
+
+    final_output_path = os.path.join(os.path.dirname(tmp_out_path), output_name)
+    os.rename(tmp_out_path, final_output_path)
+    print(f"[LOG] Output saved as: {final_output_path}")
+    return final_output_path
 
 iface = gr.Interface(
     fn=invert_pdf_document,
     inputs=[
         gr.File(label="Input PDF"),
-        gr.Textbox(label="Page Selection", value="1-12,14-20,22-32,56,66-78,82-97")
+        gr.Textbox(label="Page Selection", value="1-12,14-20,22-32,56,66-78,82-97"),
+        gr.Textbox(label="Output Name", value="inverted_output.pdf")
     ],
     outputs=gr.File(label="Output PDF"),
     title="PDF Color Inverter",
-    description="Upload a PDF and specify the pages to invert colors."
+    description="Upload a PDF, specify the pages to invert, and a custom output name."
 )
 
 if __name__ == "__main__":
