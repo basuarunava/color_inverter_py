@@ -3,3 +3,5 @@ images
 *.jpeg
 *.pdf 
 *.png
+__pycache__
+.gradio
