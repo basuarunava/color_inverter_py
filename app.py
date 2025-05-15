@@ -5,9 +5,15 @@ import tempfile
 import os
 from loguru import logger
 
-def parse_page_selection(selection):
+def parse_page_selection(selection, num_pages=None):
+    selection = selection.strip().lower()
+    if selection == "all" and num_pages is not None:
+        return list(range(num_pages))
     pages = set()
     for part in selection.split(','):
+        part = part.strip()
+        if not part:
+            continue
         if '-' in part:
             start, end = map(int, part.split('-'))
             pages.update(range(start - 1, end))  # Convert to 0-based index
@@ -21,29 +27,24 @@ def invert_colors(pix):
     return fitz.Pixmap(pix.colorspace, pix.width, pix.height, img.tobytes(), pix.alpha)
 
 def invert_pdf_pages(input_pdf, output_pdf, page_selection):
-    pages_to_invert = parse_page_selection(page_selection)
     doc = fitz.open(input_pdf)
-    
+    pages_to_invert = parse_page_selection(page_selection, len(doc))
     for page_num in pages_to_invert:
         if 0 <= page_num < len(doc):
             page = doc[page_num]
-            pix = page.get_pixmap()
+            pix = page.get_pixmap(dpi=100)  # Lower DPI for smaller images
             inverted_pix = invert_colors(pix)
             img_rect = page.rect
             page.clean_contents()
-            page.insert_image(img_rect, stream=inverted_pix.tobytes())
-
-    doc.save(output_pdf)
+            page.insert_image(img_rect, stream=inverted_pix.tobytes(), keep_proportion=True)
+    doc.save(output_pdf, deflate=True, garbage=4)
     doc.close()
-
 def remove_pdf_pages(input_pdf, output_pdf, page_selection):
     pages_to_remove = parse_page_selection(page_selection)
     doc = fitz.open(input_pdf)
-    
     for page_num in sorted(pages_to_remove, reverse=True):
         if 0 <= page_num < len(doc):
             doc.delete_page(page_num)
-
     doc.save(output_pdf)
     doc.close()
 
@@ -85,13 +86,13 @@ iface = gr.Interface(
     fn=invert_pdf_document,
     inputs=[
         gr.File(label="Input PDF"),
-        gr.Textbox(label="Output Name", value="inverted_output.pdf"),
         gr.Textbox(label="Page Selection", value="1-12,14-20,22-32,56,66-78,82-97"),
+        gr.Textbox(label="Output Name", value="inverted_output.pdf"),
         gr.Textbox(label="Pages to Remove", value="")
     ],
     outputs=gr.File(label="Output PDF"),
     title="PDF Color Inverter",
-    description="Upload a PDF, specify the pages to invert, pages to remove, and a custom output name. by @arunavabasucom"
+    description="Upload a PDF, specify the pages to invert (or type 'all'), pages to remove, and a custom output name. by @arunavabasucom"
 )
 
 if __name__ == "__main__":
